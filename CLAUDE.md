@@ -10,7 +10,7 @@ Umfang bewusst klein halten: ein Ordner, quadratisches Raster, neueste zuerst, V
 
 ## Release
 
-`./release.sh` baut mit „Developer ID Application“ (nicht notarisiert, es gibt kein notarytool-Profil) und packt `build/Flow-<version>.zip` per `ditto --noextattr --norsrc`. Version steht in `Info.plist`. Danach Commit `Version x.y.z`, Tag `vx.y.z`, `gh release create`.
+`./release.sh` baut mit „Developer ID Application“ (nicht notarisiert, es gibt kein notarytool-Profil) und packt `build/Flow-<version>.zip` per `ditto --noextattr --norsrc`. Version steht in `Info.plist`. Danach Commit `Version x.y.z`, Tag `vx.y.z`, `gh release create`. Zuletzt im Tap `~/Projekte/Claude Code/homebrew-tap` in `Casks/flow.rb` version und sha256 anpassen, Commit `flow x.y.z`.
 
 ## Aufbau
 
