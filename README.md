@@ -1,6 +1,10 @@
-# Flow
+<p align="center"><img src="docs/icon.png" width="128" alt="Flow icon"></p>
 
-A tiny, fast photo and video viewer for macOS. Point it at a folder and it shows every photo and video in a square grid, newest first. That's it.
+<h1 align="center">Flow</h1>
+
+<p align="center">A tiny, fast photo and video viewer for macOS.<br>Point it at a folder and it shows every photo and video in a square grid, newest first. That's it.</p>
+
+![Flow showing a folder of photos and videos](docs/screenshot.png)
 
 - **Fast:** thumbnails are cached on disk and generated in the background for the whole folder. Until a thumbnail is ready, Flow shows the preview embedded in the camera file, which loads quickly even from a network share.
 - **Videos play in place:** select a video and it loops inside its tile, with sound (press M to mute).
@@ -40,3 +44,5 @@ Flow started as a cleanup of [FlowVision](https://github.com/netdcy/FlowVision) 
 ## License
 
 MIT
+
+Photos in the screenshot from [Unsplash](https://unsplash.com) by [@aimha](https://unsplash.com/@aimha), [@florian_delee](https://unsplash.com/@florian_delee), [@geoglyser](https://unsplash.com/@geoglyser), [@iseenothingx](https://unsplash.com/@iseenothingx), [@jeremybishop](https://unsplash.com/@jeremybishop), [@joshuakettle](https://unsplash.com/@joshuakettle), [@kristapsungurs](https://unsplash.com/@kristapsungurs), [@pawel_czerwinski](https://unsplash.com/@pawel_czerwinski), [@robshumski](https://unsplash.com/@robshumski), [@susan_wilkinson](https://unsplash.com/@susan_wilkinson), [@vackground](https://unsplash.com/@vackground), [@viajeenparacaidas](https://unsplash.com/@viajeenparacaidas), [@world_thing](https://unsplash.com/@world_thing).
