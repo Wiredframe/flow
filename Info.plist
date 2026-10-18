@@ -2,32 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Flow</string>
-	<key>CFBundleDisplayName</key>
-	<string>Flow</string>
-	<key>CFBundleIdentifier</key>
-	<string>de.wiredframe.Flow</string>
-	<key>CFBundleExecutable</key>
-	<string>Flow</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>de</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>14.0</string>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.photography</string>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
+	<key>CFBundleDisplayName</key>
+	<string>Flow</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -45,15 +23,37 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSRemovableVolumesUsageDescription</key>
-	<string>Flow zeigt Fotos und Videos von externen Laufwerken.</string>
-	<key>NSNetworkVolumesUsageDescription</key>
-	<string>Flow zeigt Fotos und Videos von Netzlaufwerken.</string>
+	<key>CFBundleExecutable</key>
+	<string>Flow</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>de.wiredframe.Flow</string>
+	<key>CFBundleName</key>
+	<string>Flow</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.1</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.photography</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Flow zeigt Fotos und Videos aus diesem Ordner.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>Flow zeigt Fotos und Videos aus diesem Ordner.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>Flow zeigt Fotos und Videos aus diesem Ordner.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Flow zeigt Fotos und Videos von Netzlaufwerken.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Flow zeigt Fotos und Videos von externen Laufwerken.</string>
 </dict>
 </plist>

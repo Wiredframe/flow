@@ -10,7 +10,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let grid = GridViewController()
         let window = NSWindow(contentViewController: grid)
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        // Erst mit Toolbar stehen Titel und Untertitel links untereinander, das Raster läuft darunter durch.
+        let toolbar = NSToolbar(identifier: "Main")
+        toolbar.displayMode = .iconOnly
+        toolbar.allowsUserCustomization = false
+        window.toolbar = toolbar
+        window.toolbarStyle = .unified
+        window.titlebarSeparatorStyle = .automatic
         window.tabbingMode = .disallowed
         window.minSize = NSSize(width: 400, height: 300)
         if !window.setFrameUsingName("Main") {

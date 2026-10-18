@@ -125,7 +125,8 @@ final class GridViewController: NSViewController {
         stopVideo()
         items = []
         collectionView.reloadData()
-        collectionView.scroll(.zero)
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: -scrollView.contentInsets.top))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
         reload(selecting: isDir.boolValue ? nil : url)
     }
 
@@ -183,7 +184,7 @@ final class GridViewController: NSViewController {
     /// dann dürfen neue Fotos dort einfach erscheinen.
     private func scrollAnchor() -> (url: URL, offset: CGFloat)? {
         let visible = scrollView.contentView.bounds
-        guard visible.minY > 1,
+        guard visible.minY > -scrollView.contentInsets.top + 1,
               let path = collectionView.indexPathsForVisibleItems().min(),
               items.indices.contains(path.item),
               let frame = collectionView.layoutAttributesForItem(at: path)?.frame else { return nil }
@@ -195,14 +196,14 @@ final class GridViewController: NSViewController {
         collectionView.layoutSubtreeIfNeeded()
         guard let frame = collectionView.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame
         else { return }
-        let y = max(0, frame.minY - anchor.offset)
+        let y = max(-scrollView.contentInsets.top, frame.minY - anchor.offset)
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     private func updateTitle() {
         guard let window = view.window, let folder else { return }
-        window.title = (folder.path as NSString).abbreviatingWithTildeInPath
+        window.title = folder.lastPathComponent
         window.representedURL = folder
         let videos = items.filter(\.isVideo).count
         let photos = items.count - videos
