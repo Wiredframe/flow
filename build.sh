@@ -3,8 +3,12 @@
 set -euo pipefail
 cd "${0:A:h}"
 
-swift build -c release --disable-sandbox
-bin="$(swift build -c release --disable-sandbox --show-bin-path)"
+# SwiftPM trägt sonst das Deployment-Ziel als SDK-Version ein, dann zeigt macOS die App im alten Look
+# (kleine Ampeln, flache Titelleiste). Mit der echten SDK-Version gibt es das aktuelle Fensterdesign.
+sdk="$(xcrun --show-sdk-version)"
+flags=(-c release --disable-sandbox -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$sdk")
+swift build "${flags[@]}"
+bin="$(swift build "${flags[@]}" --show-bin-path)"
 
 app=build/Flow.app
 rm -rf "$app"
