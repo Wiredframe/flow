@@ -8,7 +8,7 @@
 
 - **Fast:** thumbnails are cached on disk and generated in the background for the whole folder. Until a thumbnail is ready, Flow shows the preview embedded in the camera file, which loads quickly even from a network share.
 - **Videos play in place:** select a video and it loops inside its tile, with sound (press M to mute).
-- **Live:** new files in the folder show up on their own, without the grid jumping around.
+- **Live:** new files in the folder show up on their own, without the grid jumping around. Pull down past the top on the trackpad to rescan by hand.
 - **Remembers the last folder**, and waits for a network drive to come back if it isn't mounted yet.
 
 ## Keys

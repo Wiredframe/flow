@@ -6,7 +6,8 @@ final class GridViewController: NSViewController {
     static let tileSizes: [Double] = [120, 160, 200, 260, 320]
     private let spacing: CGFloat = 10
 
-    private let scrollView = NSScrollView()
+    private let scrollView = PullScrollView()
+    private let pullSpinner = NSProgressIndicator()
     private let collectionView = GridCollectionView()
     private let layout = NSCollectionViewFlowLayout()
     private let emptyLabel = NSTextField(labelWithString: "Ordner hierher ziehen oder mit ⌘O öffnen")
@@ -60,7 +61,15 @@ final class GridViewController: NSViewController {
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
         scrollView.postsFrameChangedNotifications = true
+        scrollView.verticalScrollElasticity = .allowed
+        scrollView.onPull = { [weak self] in self?.pullToRefresh() }
+        scrollView.onOverscroll = { [weak self] in self?.updatePullSpinner() }
         root.addSubview(scrollView)
+
+        pullSpinner.style = .spinning
+        pullSpinner.isHidden = true
+        pullSpinner.sizeToFit()
+        root.addSubview(pullSpinner)
         NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main
         ) { [weak self] _ in self?.updateItemSize() }
@@ -153,11 +162,50 @@ final class GridViewController: NSViewController {
         }
     }
 
-    private func reload(selecting target: URL?) {
-        guard let folder else { return }
+    // MARK: Ziehen zum Aktualisieren
+
+    private var refreshing = false
+
+    /// Ganz oben über den Rand hinaus ziehen und loslassen liest den Ordner neu ein, falls der
+    /// Watcher etwas verpasst hat (Netzlaufwerke melden nicht jede Änderung).
+    private func pullToRefresh() {
+        guard folder != nil, !refreshing else { return }
+        refreshing = true
+        pullSpinner.startAnimation(nil)
+        updatePullSpinner()
+        let started = Date()
+        reload(selecting: nil) { [weak self] in
+            // Kurz stehen lassen, sonst sieht man bei schnellen Ordnern gar nichts.
+            let rest = max(0, 0.5 - Date().timeIntervalSince(started))
+            DispatchQueue.main.asyncAfter(deadline: .now() + rest) {
+                guard let self else { return }
+                self.refreshing = false
+                self.pullSpinner.stopAnimation(nil)
+                self.updatePullSpinner()
+            }
+        }
+    }
+
+    /// Der Spinner sitzt im Spalt, den das Ziehen über dem Raster öffnet, und wird dabei deutlicher.
+    private func updatePullSpinner() {
+        let overscroll = scrollView.overscroll
+        let visible = refreshing || (folder != nil && overscroll > 4)
+        pullSpinner.isHidden = !visible
+        guard visible else { return }
+        pullSpinner.alphaValue = refreshing ? 1 : min(1, overscroll / PullScrollView.threshold)
+        let size = pullSpinner.frame.size
+        let gap = refreshing ? max(overscroll, 48) : overscroll
+        let top = view.bounds.maxY - scrollView.contentInsets.top
+        pullSpinner.setFrameOrigin(NSPoint(x: round(view.bounds.midX - size.width / 2),
+                                           y: round(top - gap / 2 - size.height / 2)))
+    }
+
+    private func reload(selecting target: URL?, completion: (() -> Void)? = nil) {
+        guard let folder else { completion?(); return }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let scanned = FolderScanner.scan(folder)
             DispatchQueue.main.async { [weak self] in
+                defer { completion?() }
                 guard let self, self.folder == folder else { return }
                 // Netzlaufwerke melden auch Änderungen, wo keine sind: dann nichts anfassen.
                 if target == nil, scanned == self.items { return }
@@ -444,6 +492,33 @@ final class GridCollectionView: NSCollectionView {
         super.mouseDown(with: event)
         let hit = indexPathForItem(at: convert(event.locationInWindow, from: nil))
         if event.clickCount == 2, hit != nil { onDoubleClick?() }
+    }
+}
+
+/// Meldet, wie weit oben über den Rand hinaus gezogen wird, und ob beim Loslassen weit genug.
+final class PullScrollView: NSScrollView {
+    static let threshold: CGFloat = 70
+    var onPull: (() -> Void)?
+    var onOverscroll: (() -> Void)?
+    private var armed = false
+
+    /// Wie weit der Inhalt gerade über seinen oberen Rand hinaus gezogen ist.
+    var overscroll: CGFloat { max(0, -(contentView.bounds.minY + contentInsets.top)) }
+
+    override func scrollWheel(with event: NSEvent) {
+        super.scrollWheel(with: event)
+        // Nur die Geste mit den Fingern zählt, nicht der Schwung danach.
+        switch event.phase {
+        case .began, .changed: armed = overscroll >= Self.threshold
+        case .ended: if armed { onPull?() }
+        default: break
+        }
+    }
+
+    /// Läuft bei jeder Bewegung, auch beim Zurückfedern ohne Finger.
+    override func reflectScrolledClipView(_ clipView: NSClipView) {
+        super.reflectScrolledClipView(clipView)
+        onOverscroll?()
     }
 }
 
