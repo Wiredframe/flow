@@ -7,7 +7,8 @@
 ![Flow showing a folder of photos and videos](docs/screenshot.png)
 
 - **Fast:** thumbnails are cached on disk and generated in the background for the whole folder. Until a thumbnail is ready, Flow shows the preview embedded in the camera file, which loads quickly even from a network share.
-- **Videos play in place:** select a video and it loops inside its tile, with sound (press M to mute).
+- **Videos play in place:** select a video and it loops inside its tile, with sound (press M to mute). Optionally all videos in view play at once, all with sound.
+- **Collage:** optionally show tiles cropped to 4:3 or 3:4 depending on orientation, in rows that fill the width.
 - **Live:** new files in the folder show up on their own, without the grid jumping around. Pull down past the top on the trackpad to rescan by hand.
 - **Remembers the last folder**, and waits for a network drive to come back if it isn't mounted yet.
 
@@ -20,6 +21,8 @@
 | Space, double-click | Quick Look |
 | M | Sound on/off |
 | ⇧⌘N | Show/hide file names |
+| ⇧⌘C | Collage on/off |
+| ⇧⌘A | Play all videos on/off |
 | ⌘+ / ⌘− | Larger/smaller tiles |
 | ⌘R | Show in Finder |
 
@@ -39,7 +42,7 @@ Swift Package, AppKit, no dependencies. The app icon is drawn by `Tools/make-ico
 
 ## Background
 
-Flow started as a cleanup of [FlowVision](https://github.com/netdcy/FlowVision) and ended up as a from-scratch rewrite with a much smaller scope: under 1,000 lines instead of 33,000. The interface is in German.
+Flow started as a cleanup of [FlowVision](https://github.com/netdcy/FlowVision) and ended up as a from-scratch rewrite with a much smaller scope: about 1,300 lines instead of 33,000. The interface is in German.
 
 ## License
 

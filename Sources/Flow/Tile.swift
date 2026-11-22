@@ -15,7 +15,7 @@ final class TileItem: NSCollectionViewItem {
     }
 
     var hasImage: Bool { tile.image != nil }
-    var isPlaying: Bool { tile.isPlaying }
+    var mediaRect: NSRect { tile.mediaRect }
 
     func show(_ media: MediaItem, image: CGImage?, showName: Bool) {
         self.media = media
@@ -55,12 +55,16 @@ final class TileView: NSView {
         didSet {
             label.stringValue = name ?? ""
             label.isHidden = name == nil
+            needsLayout = true
         }
     }
     var isSelected = false {
         didSet { updateColors() }
     }
-    var isPlaying: Bool { playerLayer.player != nil }
+    /// Fläche für Bild und Video, darunter bleibt Platz für den Namen.
+    var mediaRect: NSRect {
+        NSRect(x: 0, y: 0, width: bounds.width, height: max(0, bounds.height - (name == nil ? 0 : Self.nameHeight)))
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -96,14 +100,14 @@ final class TileView: NSView {
 
     override func layout() {
         super.layout()
-        let square = CGRect(x: 0, y: 0, width: bounds.width, height: bounds.width)
+        let media = mediaRect
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        imageLayer.frame = square
-        playerLayer.frame = square
-        ringLayer.frame = square
+        imageLayer.frame = media
+        playerLayer.frame = media
+        ringLayer.frame = media
         CATransaction.commit()
-        label.frame = CGRect(x: 0, y: square.maxY + 3, width: bounds.width, height: Self.nameHeight - 3)
+        label.frame = CGRect(x: 0, y: media.maxY + 3, width: bounds.width, height: Self.nameHeight - 3)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -122,6 +126,7 @@ final class TileView: NSView {
 
     /// Zeigt das Video erst, wenn das erste Bild da ist, damit nichts schwarz aufblitzt.
     func playVideo(_ player: AVPlayer) {
+        guard playerLayer.player !== player else { return }
         playerLayer.player = player
         readyObservation = playerLayer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] layer, _ in
             DispatchQueue.main.async {

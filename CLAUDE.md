@@ -2,7 +2,7 @@
 
 Minimaler Foto- und Video-Viewer für macOS, entstanden als radikaler Ersatz für FlowVision (netdcy/FlowVision). Neu geschrieben, kein Code übernommen. Öffentlich als github.com/Wiredframe/flow.
 
-Umfang bewusst klein halten: ein Ordner, quadratisches Raster, neueste zuerst, Vorschaubilder gecacht, ausgewähltes Video spielt mit Ton in Schleife in seiner Kachel. Keine Sortier-, Layout- oder Stiloptionen ergänzen, ohne dass der Nutzer es ausdrücklich will.
+Umfang bewusst klein halten: ein Ordner, quadratisches Raster (wahlweise Collage mit 4:3/3:4), neueste zuerst, Vorschaubilder gecacht, ausgewähltes Video spielt mit Ton in Schleife in seiner Kachel (wahlweise laufen alle Videos im sichtbaren Bereich, alle mit Ton). Keine Sortier-, Layout- oder Stiloptionen ergänzen, ohne dass der Nutzer es ausdrücklich will.
 
 ## Bauen und starten
 
@@ -15,11 +15,14 @@ Umfang bewusst klein halten: ein Ordner, quadratisches Raster, neueste zuerst, V
 ## Aufbau
 
 - `Folder.swift`: Ordner einlesen (`FolderScanner`), Änderungen beobachten (`FolderWatcher`)
-- `ThumbnailCache.swift`: quadratische 640-px-JPEGs unter `~/Library/Caches/de.wiredframe.Flow/Thumbnails`, Speicher-Cache, Vorab-Erzeugung im Hintergrund, Aufräumen ab 2 GB
-- `GridViewController.swift`: Raster, Auswahl, Video-Wiedergabe, Quick Look (Leertaste, Doppelklick), Menübefehle
+- `ThumbnailCache.swift`: JPEGs in 4:3 bzw. 3:4 (kurze Seite 640 px) unter `~/Library/Caches/de.wiredframe.Flow/Previews`, das quadratische Raster schneidet sie beim Anzeigen zu; merkt sich die Ausrichtung je Datei in `Orientations.plist` (Schlüssel nur als Hash, verwaiste Einträge fallen beim Aufräumen heraus, „Ablage › Caches leeren“ löscht alles); Speicher-Cache, Vorab-Erzeugung im Hintergrund, Aufräumen ab 2 GB
+- `CollageLayout.swift`: Zeilen gleicher Höhe, die die Breite füllen (Ausrichtung unbekannt = quer)
+- `GridViewController.swift`: Raster, Auswahl, Video-Wiedergabe (ein `LoopPlayer` je laufendem Video), Quick Look (Leertaste, Doppelklick), Menübefehle
 - `Tile.swift`: Kachel mit Bild, Player-Layer, Auswahlring, Dateiname
 
-Einstellungen in `UserDefaults` (`de.wiredframe.Flow`): `showNames`, `tileSize`, `muted`, `lastFolder`.
+Einstellungen in `UserDefaults` (`de.wiredframe.Flow`): `showNames`, `tileSize`, `muted`, `collage`, `autoplay`, `lastFolder`.
+
+Zum Testen neben der installierten Version: `CFFIXED_USER_HOME=<scratch> build/Flow.app/Contents/MacOS/Flow -lastFolder <ordner> -collage YES`, dann bleiben Cache und Einstellungen getrennt.
 
 ## Icon
 

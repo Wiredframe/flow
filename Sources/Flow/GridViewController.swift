@@ -10,12 +10,13 @@ final class GridViewController: NSViewController {
     private let pullSpinner = NSProgressIndicator()
     private let collectionView = GridCollectionView()
     private let layout = NSCollectionViewFlowLayout()
+    private let collageLayout = CollageLayout()
     private let emptyLabel = NSTextField(labelWithString: "Ordner hierher ziehen oder mit ⌘O öffnen")
 
-    private let player = AVQueuePlayer()
-    private var looper: AVPlayerLooper?
-    private var playingURL: URL?
-    private weak var playingTile: TileItem?
+    /// Laufende Videos: das ausgewählte, bei „Alle Videos abspielen“ auch alle sichtbaren.
+    private var players: [URL: LoopPlayer] = [:]
+    private var playbackPending = false
+    private var quickLookOpen = false
 
     private(set) var folder: URL?
     private var items: [MediaItem] = []
@@ -36,6 +37,14 @@ final class GridViewController: NSViewController {
         get { defaults.object(forKey: "muted") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "muted") }
     }
+    private var collage: Bool {
+        get { defaults.bool(forKey: "collage") }
+        set { defaults.set(newValue, forKey: "collage") }
+    }
+    private var autoplay: Bool {
+        get { defaults.bool(forKey: "autoplay") }
+        set { defaults.set(newValue, forKey: "autoplay") }
+    }
 
     override func loadView() {
         let root = DropView(frame: NSRect(x: 0, y: 0, width: 1200, height: 800))
@@ -44,7 +53,13 @@ final class GridViewController: NSViewController {
         layout.minimumInteritemSpacing = spacing
         layout.minimumLineSpacing = spacing
         layout.sectionInset = NSEdgeInsets(top: spacing, left: spacing, bottom: spacing, right: spacing)
-        collectionView.collectionViewLayout = layout
+        collageLayout.spacing = spacing
+        collageLayout.aspect = { [weak self] index in
+            guard let self, self.items.indices.contains(index),
+                  ThumbnailCache.shared.isPortrait(self.items[index]) == true else { return 4 / 3 }
+            return 3 / 4
+        }
+        collectionView.collectionViewLayout = collage ? collageLayout : layout
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.isSelectable = true
@@ -64,6 +79,7 @@ final class GridViewController: NSViewController {
         scrollView.verticalScrollElasticity = .allowed
         scrollView.onPull = { [weak self] in self?.pullToRefresh() }
         scrollView.onOverscroll = { [weak self] in self?.updatePullSpinner() }
+        scrollView.contentView.postsBoundsChangedNotifications = true
         root.addSubview(scrollView)
 
         pullSpinner.style = .spinning
@@ -73,6 +89,13 @@ final class GridViewController: NSViewController {
         NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main
         ) { [weak self] _ in self?.updateItemSize() }
+        // Beim Scrollen kommen Videos ins Bild, die mitlaufen sollen.
+        NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification, object: scrollView.contentView, queue: .main
+        ) { [weak self] _ in if self?.autoplay == true { self?.schedulePlayback() } }
+        NotificationCenter.default.addObserver(
+            forName: ThumbnailCache.orientationsChanged, object: nil, queue: .main
+        ) { [weak self] _ in self?.orientationsChanged() }
 
         emptyLabel.font = .systemFont(ofSize: 15)
         emptyLabel.textColor = .secondaryLabelColor
@@ -83,23 +106,23 @@ final class GridViewController: NSViewController {
             emptyLabel.centerYAnchor.constraint(equalTo: root.centerYAnchor),
         ])
 
-        player.isMuted = muted
         view = root
 
         // Im Dock oder ausgeblendet läuft kein Video weiter, schon gar nicht mit Ton.
         let center = NotificationCenter.default
-        for name in [NSApplication.didHideNotification, NSWindow.didMiniaturizeNotification] {
-            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.player.pause() }
-        }
-        for name in [NSApplication.didUnhideNotification, NSWindow.didDeminiaturizeNotification] {
-            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.resumeIfVisible() }
+        for name in [NSApplication.didHideNotification, NSWindow.didMiniaturizeNotification,
+                     NSApplication.didUnhideNotification, NSWindow.didDeminiaturizeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.updateRunning() }
         }
     }
 
-    private func resumeIfVisible() {
-        guard playingURL != nil, !NSApp.isHidden, view.window?.isMiniaturized == false,
-              !(QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible) else { return }
-        player.play()
+    private var mayPlay: Bool {
+        !NSApp.isHidden && view.window?.isMiniaturized != true && !quickLookOpen
+    }
+
+    private func updateRunning() {
+        let play = mayPlay
+        for loop in players.values { if play { loop.player.play() } else { loop.player.pause() } }
     }
 
     override func viewDidLayout() {
@@ -108,7 +131,10 @@ final class GridViewController: NSViewController {
     }
 
     /// So viele Spalten, wie in Wunschgröße passen, die Kacheln füllen dann die Breite.
+    /// In der Collage ist die Wunschgröße die Zeilenhöhe.
     private func updateItemSize() {
+        collageLayout.rowHeight = CGFloat(tileSize)
+        collageLayout.nameHeight = showNames ? TileView.nameHeight : 0
         let width = scrollView.contentSize.width - layout.sectionInset.left - layout.sectionInset.right
         guard width > 0 else { return }
         let columns = max(1, Int((width + spacing) / (CGFloat(tileSize) + spacing)))
@@ -131,7 +157,7 @@ final class GridViewController: NSViewController {
         self.folder = folder
         defaults.set(folder.path, forKey: "lastFolder")
         watcher = FolderWatcher(folder) { [weak self] in self?.scheduleRescan() }
-        stopVideo()
+        stopAllVideos()
         items = []
         collectionView.reloadData()
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: -scrollView.contentInsets.top))
@@ -275,36 +301,64 @@ final class GridViewController: NSViewController {
         updatePlayback()
     }
 
-    /// Ein ausgewähltes Video läuft in Schleife in seiner Kachel.
+    /// Ein ausgewähltes Video läuft in Schleife in seiner Kachel, mit Ton. Bei „Alle Videos
+    /// abspielen“ laufen stattdessen alle Videos im sichtbaren Bereich, ebenfalls mit Ton.
     private func updatePlayback() {
-        guard let index = selectedIndex, items[index].isVideo else { stopVideo(); return }
-        let media = items[index]
-        if playingURL != media.url {
-            stopVideo()
-            playingURL = media.url
-            looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: media.url))
-            player.play()
+        let selected = selectedItem.flatMap { $0.isVideo ? $0.url : nil }
+        var wanted = Set<URL>()
+        if autoplay {
+            // Ohne den Streifen unter der Titelleiste, dort ist nichts zu sehen.
+            var visible = scrollView.documentVisibleRect
+            let hidden = scrollView.contentInsets.top
+            visible.origin.y += hidden
+            visible.size.height -= hidden
+            for path in collectionView.indexPathsForVisibleItems()
+            where items.indices.contains(path.item) && items[path.item].isVideo {
+                if let frame = collectionView.layoutAttributesForItem(at: path)?.frame, frame.intersects(visible) {
+                    wanted.insert(items[path.item].url)
+                }
+            }
+        } else if let selected {
+            wanted.insert(selected)
         }
-        if let tile = collectionView.item(at: IndexPath(item: index, section: 0)) as? TileItem {
-            attachPlayer(to: tile)
+        for url in players.keys where !wanted.contains(url) {
+            players.removeValue(forKey: url)?.stop()
+        }
+        let play = mayPlay
+        for url in wanted where players[url] == nil {
+            let loop = LoopPlayer(url)
+            players[url] = loop
+            if play { loop.player.play() }
+        }
+        for loop in players.values { loop.player.isMuted = muted }
+        for case let tile as TileItem in collectionView.visibleItems() {
+            if let url = tile.media?.url, let loop = players[url] { tile.playVideo(loop.player) } else { tile.stopVideo() }
         }
     }
 
-    private func attachPlayer(to tile: TileItem) {
-        if tile === playingTile && tile.isPlaying { return }
-        if playingTile !== tile { playingTile?.stopVideo() }
-        tile.playVideo(player)
-        playingTile = tile
+    /// Fasst die vielen Anlässe beim Scrollen zu einem Durchlauf zusammen.
+    private func schedulePlayback() {
+        guard !playbackPending else { return }
+        playbackPending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.playbackPending = false
+            self?.updatePlayback()
+        }
     }
 
-    private func stopVideo() {
-        playingTile?.stopVideo()
-        playingTile = nil
-        looper?.disableLooping()
-        looper = nil
-        player.pause()
-        player.removeAllItems()
-        playingURL = nil
+    private func stopAllVideos() {
+        for case let tile as TileItem in collectionView.visibleItems() { tile.stopVideo() }
+        for loop in players.values { loop.stop() }
+        players = [:]
+    }
+
+    /// In der Collage verschieben neu bekannte Ausrichtungen die Kacheln, der Blick bleibt stehen.
+    private func orientationsChanged() {
+        guard collage else { return }
+        let anchor = scrollAnchor()
+        collageLayout.invalidateLayout()
+        if let anchor { restore(anchor) }
+        if autoplay { schedulePlayback() }
     }
 
     // MARK: Befehle
@@ -325,6 +379,16 @@ final class GridViewController: NSViewController {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    @objc func clearCaches(_ sender: Any?) {
+        ThumbnailCache.shared.clear()
+        let keep = selectedIndex
+        for case let tile as TileItem in collectionView.visibleItems() { tile.setImage(nil) }
+        collectionView.reloadData()
+        if let keep { collectionView.selectionIndexPaths = [IndexPath(item: keep, section: 0)] }
+        ThumbnailCache.shared.prewarm(items)
+        updatePlayback()
+    }
+
     @objc func toggleNames(_ sender: Any?) {
         showNames.toggle()
         for case let tile as TileItem in collectionView.visibleItems() { tile.showName(showNames) }
@@ -333,7 +397,23 @@ final class GridViewController: NSViewController {
 
     @objc func toggleSound(_ sender: Any?) {
         muted.toggle()
-        player.isMuted = muted
+        updatePlayback()
+    }
+
+    @objc func toggleCollage(_ sender: Any?) {
+        collage.toggle()
+        collectionView.collectionViewLayout = collage ? collageLayout : layout
+        updateItemSize()
+        collectionView.layoutSubtreeIfNeeded()
+        if let index = selectedIndex {
+            collectionView.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .centeredVertically)
+        }
+        schedulePlayback()
+    }
+
+    @objc func toggleAutoplay(_ sender: Any?) {
+        autoplay.toggle()
+        updatePlayback()
     }
 
     @objc func zoomIn(_ sender: Any?) {
@@ -377,14 +457,15 @@ final class GridViewController: NSViewController {
     override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
         panel.dataSource = self
         panel.delegate = self
-        player.pause()
+        quickLookOpen = true
+        updateRunning()
     }
 
     override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
         panel.dataSource = nil
         panel.delegate = nil
-        // Das Panel gilt hier noch als sichtbar, deshalb ohne Quick-Look-Prüfung.
-        if playingURL != nil, !NSApp.isHidden { player.play() }
+        quickLookOpen = false
+        updateRunning()
     }
 }
 
@@ -412,9 +493,10 @@ extension GridViewController: NSCollectionViewDataSource, NSCollectionViewDelega
 
     func collectionView(_ collectionView: NSCollectionView, willDisplay item: NSCollectionViewItem,
                         forRepresentedObjectAt indexPath: IndexPath) {
-        if let tile = item as? TileItem, tile.media?.url == playingURL, playingURL != nil {
-            attachPlayer(to: tile)
+        if let tile = item as? TileItem, let url = tile.media?.url, let loop = players[url] {
+            tile.playVideo(loop.player)
         }
+        if autoplay { schedulePlayback() }
     }
 
     func collectionView(_ collectionView: NSCollectionView, didEndDisplaying item: NSCollectionViewItem,
@@ -422,10 +504,8 @@ extension GridViewController: NSCollectionViewDataSource, NSCollectionViewDelega
         guard let tile = item as? TileItem else { return }
         tile.loading?.cancel()
         tile.loading = nil
-        if tile === playingTile {
-            tile.stopVideo()
-            playingTile = nil
-        }
+        tile.stopVideo()
+        if autoplay { schedulePlayback() }
     }
 
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
@@ -444,6 +524,8 @@ extension GridViewController: NSMenuItemValidation {
         switch menuItem.action {
         case #selector(toggleNames(_:)): menuItem.state = showNames ? .on : .off
         case #selector(toggleSound(_:)): menuItem.state = muted ? .off : .on
+        case #selector(toggleCollage(_:)): menuItem.state = collage ? .on : .off
+        case #selector(toggleAutoplay(_:)): menuItem.state = autoplay ? .on : .off
         case #selector(zoomIn(_:)): return tileSize < Self.tileSizes.last!
         case #selector(zoomOut(_:)): return tileSize > Self.tileSizes.first!
         case #selector(showInFinder(_:)): return folder != nil
@@ -472,13 +554,29 @@ extension GridViewController: QLPreviewPanelDataSource, QLPreviewPanelDelegate {
 
     func previewPanel(_ panel: QLPreviewPanel!, sourceFrameOnScreenFor item: QLPreviewItem!) -> NSRect {
         guard let index = selectedIndex, let window = view.window,
-              let tile = collectionView.item(at: IndexPath(item: index, section: 0)) else { return .zero }
-        let side = tile.view.bounds.width
-        return window.convertToScreen(tile.view.convert(NSRect(x: 0, y: 0, width: side, height: side), to: nil))
+              let tile = collectionView.item(at: IndexPath(item: index, section: 0)) as? TileItem else { return .zero }
+        return window.convertToScreen(tile.view.convert(tile.mediaRect, to: nil))
     }
 }
 
 // MARK: - Views
+
+/// Ein Video in Endlosschleife.
+final class LoopPlayer {
+    let player = AVQueuePlayer()
+    private var looper: AVPlayerLooper?
+
+    init(_ url: URL) {
+        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+    }
+
+    func stop() {
+        looper?.disableLooping()
+        looper = nil
+        player.pause()
+        player.removeAllItems()
+    }
+}
 
 final class GridCollectionView: NSCollectionView {
     var onSpace: (() -> Void)?

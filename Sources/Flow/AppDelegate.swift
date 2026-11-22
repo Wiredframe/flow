@@ -79,12 +79,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         submenu("Ablage", [
             item("Ordner öffnen …", #selector(GridViewController.openFolder(_:)), "o"),
             item("Im Finder zeigen", #selector(GridViewController.showInFinder(_:)), "r"),
+            item("Caches leeren", #selector(GridViewController.clearCaches(_:))),
             .separator(),
             item("Fenster schließen", #selector(NSWindow.performClose(_:)), "w"),
         ])
         submenu("Darstellung", [
             item("Dateinamen", #selector(GridViewController.toggleNames(_:)), "n", [.command, .shift]),
+            item("Collage", #selector(GridViewController.toggleCollage(_:)), "c", [.command, .shift]),
+            .separator(),
             item("Ton", #selector(GridViewController.toggleSound(_:)), "m", []),
+            item("Alle Videos abspielen", #selector(GridViewController.toggleAutoplay(_:)), "a", [.command, .shift]),
             .separator(),
             item("Größer", #selector(GridViewController.zoomIn(_:)), "+"),
             item("Kleiner", #selector(GridViewController.zoomOut(_:)), "-"),
