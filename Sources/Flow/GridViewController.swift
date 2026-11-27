@@ -3,7 +3,7 @@ import AVFoundation
 import Quartz
 
 final class GridViewController: NSViewController {
-    static let tileSizes: [Double] = [120, 160, 200, 260, 320]
+    static let tileSizes: [Double] = [120, 160, 200, 260, 320, 400]
     private let spacing: CGFloat = 10
 
     private let scrollView = PullScrollView()
